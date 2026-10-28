@@ -1,0 +1,126 @@
+{
+  "planHash": "e7f1b45d9d7bf517c9004329744d74c4516f8dfab24ff3f3a7a562b8d7eef9a5",
+  "phase": "standalone",
+  "recordedAtUtc": "2026-10-28T18:48:19.6019737Z",
+  "retryCount": 0,
+  "resetBaseline": false,
+  "complete": true,
+  "result": {
+    "setupSucceeded": true,
+    "setupDurationMs": 16911,
+    "setupFailureOutput": null,
+    "assertions": [
+      {
+        "name": "backend-syntax",
+        "kind": "process",
+        "verificationMethod": "exit-code",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "",
+        "durationMs": 263
+      },
+      {
+        "name": "api-health-200",
+        "kind": "http-probe",
+        "verificationMethod": "http-status",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": null,
+        "outputSample": "HTTP 200\n{\u0022status\u0022:\u0022success\u0022,\u0022message\u0022:\u0022Ed Tech Interactive Learning and Assessment Portal API is healthy and operational\u0022,\u0022timestamp\u0022:\u00222026-10-28T18:48:14.336Z\u0022}\n--- server output ---\n\r\n\u003E ed-tech-portal-backend@1.0.0 start\r\n\u003E node src/server.js\r\n\r\n[MongoDB Connected]: 127.0.0.1/edtech_learning_portal\r\n====================================================\r\n Ed Tech Interactive Learning and Assessment Portal\r\n Server running in development mode on http://localhost:5518\r\n====================================================\r\n",
+        "durationMs": 3889
+      },
+      {
+        "name": "tests-pass",
+        "kind": "process",
+        "verificationMethod": "test-results",
+        "passed": true,
+        "timedOut": false,
+        "skipped": false,
+        "skippedReason": null,
+        "exitCode": 0,
+        "outputSample": "\r\n\u003E ed-tech-portal-backend@1.0.0 test\r\n\u003E node test_portal.js\r\n\r\n[PASS] API health check\r\n[PASS] Reject invalid email registration\r\n[PASS] Reject elevated role in public registration\r\n[PASS] Instructor registration creates a student account with a pending request\r\n[PASS] Reject administrator registration from an unauthorized or unconfigured email\r\n[PASS] Register a new student account\r\n[PASS] Registration does not automatically create a login session\r\n[PASS] Reject duplicate email registration\r\n[PASS] Pending instructor request does not grant instructor login role\r\n[PASS] Authenticate students from their stored database role\r\n[PASS] Reject unauthenticated administrator API requests\r\n[PASS] Pending instructor requests do not grant instructor API access\r\n[PASS] Reject incorrect login credentials\r\n[PASS] Log in with the registered credentials\r\n[PASS] Store JWT in an HTTP-only, same-site cookie\r\n[PASS] Load the authenticated student session\r\n[PASS] Ignore frontend role tampering and enforce the MongoDB role\r\n[PASS] Persist only a bcrypt-hashed password\r\n[PASS] Deny student access to administrator routes\r\n[PASS] Deny student access to instructor routes\r\n[PASS] Existing course catalog endpoint responds\r\n[PASS] Existing assessments endpoint responds\r\n[PASS] Existing quizzes endpoint responds\r\n[PASS] Existing student progress endpoint responds\r\n[PASS] Require email verification before login when enabled\r\n[PASS] Verify an account with its valid expiring token\r\n[PASS] Allow login after email verification\r\n[PASS] Logout clears the authentication cookie\r\n[PASS] Unauthenticated requests are rejected after logout\r\n\r\nResults: 29/29 checks passed.\r\n",
+        "durationMs": 4931,
+        "testResults": {
+          "testFramework": "unknown",
+          "runnerDetectedFrom": "none",
+          "testsTotal": 0,
+          "testsPassed": 0,
+          "testsFailed": 0,
+          "testsSkipped": 0,
+          "parseFailed": true
+        }
+      }
+    ],
+    "executions": [
+      {
+        "source": "setup[0]",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "ci"
+        ],
+        "cwd": "C:\\Users\\Shriva\\Documents\\PROJECTS\\LEARN-IT\\LEARN-IT\\backend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "devServer",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "start"
+        ],
+        "cwd": "C:\\Users\\Shriva\\Documents\\PROJECTS\\LEARN-IT\\LEARN-IT\\backend",
+        "env": {
+          "PORT": "5517"
+        },
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "backend-syntax",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\node.EXE",
+        "args": [
+          "--check",
+          "src/server.js"
+        ],
+        "cwd": "C:\\Users\\Shriva\\Documents\\PROJECTS\\LEARN-IT\\LEARN-IT\\backend",
+        "env": {},
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "api-health-200",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "run",
+          "start"
+        ],
+        "cwd": "C:\\Users\\Shriva\\Documents\\PROJECTS\\LEARN-IT\\LEARN-IT\\backend",
+        "env": {
+          "PORT": "5518"
+        },
+        "prependPath": [],
+        "platform": "win32"
+      },
+      {
+        "source": "tests-pass",
+        "resolvedExecutable": "C:\\Program Files\\nodejs\\npm.CMD",
+        "args": [
+          "test"
+        ],
+        "cwd": "C:\\Users\\Shriva\\Documents\\PROJECTS\\LEARN-IT\\LEARN-IT\\backend",
+        "env": {
+          "PORT": "5517"
+        },
+        "prependPath": [],
+        "platform": "win32"
+      }
+    ]
+  }
+}

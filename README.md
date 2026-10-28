@@ -47,15 +47,11 @@ The curriculum features six subjects with structured learning units, 30 assessme
 
 ---
 
-## 🔑 Default Credentials (Seed Accounts)
+## 🔐 Authentication
 
-| Role | Email Address | Password | Primary Dashboard | Privileges & Key Workflows |
-| :--- | :--- | :--- | :--- | :--- |
-| **🎓 Student** | `student@edtech.com` | `Student@123` | `/dashboard` | Enrolled in 6 courses, watch video lectures, read notes, attempt 180 assessment questions, take 120 timed speed quizzes, track graduation progress |
-| **👨‍🏫 Instructor** | `instructor@edtech.com` | `Instructor@123` | `/instructor/dashboard` | Create & edit courses, upload video/notes lessons, toggle published/draft status, monitor enrolled student rosters, view student assessment scores |
-| **🛡️ Administrator** | `admin@edtech.com` | `Admin@123` | `/admin/dashboard` | System health analytics, view all registered accounts, change user roles (Student ⇄ Instructor ⇄ Admin), toggle account activation/deactivation |
+Students register with their own name, email address, and password. Passwords are hashed with bcrypt before storage. Public registration assigns the student role; instructor requests require administrator approval. Only the normalized email configured in the backend's `ADMIN_EMAIL` variable can hold administrator access. Login uses an HTTP-only JWT cookie, and registration does not automatically sign users in.
 
-*(Quick-autofill cards are integrated directly into the login screen and an instantaneous Demo Role Switcher is available in the top navigation bar).*
+Email verification is optional and disabled by default. To require it, configure the SMTP environment variables described below and set `EMAIL_VERIFICATION_ENABLED=true`. When enabled, verification links expire after 24 hours.
 
 ---
 
@@ -64,7 +60,7 @@ The curriculum features six subjects with structured learning units, 30 assessme
 ### 1. Permission Matrix
 | Functional Capability | Student | Instructor | Administrator | Security Rule & Implementation |
 | :--- | :---: | :---: | :---: | :--- |
-| **Public Registration** | ✅ | ✅ | ❌ | Admin accounts cannot be self-registered |
+| **Public Registration** | ✅ | ⏳ | ❌ | Instructor requests require approval; admin access is limited to `ADMIN_EMAIL` and secure bootstrap |
 | **Course Catalog Access** | ✅ | ✅ | ✅ | Open to all authenticated users |
 | **Video Lectures & Study Notes** | ✅ | ✅ | ✅ | Accessible across all user roles |
 | **Mark Lessons Completed** | ✅ | ❌ | ❌ | Recalculates individual student progress in MongoDB |
@@ -75,7 +71,7 @@ The curriculum features six subjects with structured learning units, 30 assessme
 | **Publish / Unpublish Courses** | ❌ | ✅ | ✅ | `PATCH /api/courses/:id/publish` |
 | **View Enrolled Student Rosters** | ❌ | ✅ | ✅ | `GET /api/instructor/students` |
 | **View Student Cohort Scores** | ❌ | ✅ | ✅ | Faculty monitoring of all student attempts |
-| **User Role Management** | ❌ | ❌ | ✅ | `PATCH /api/admin/users/:id/role` (Admin exclusive) |
+| **User Role Management** | ❌ | ❌ | ✅ | `PATCH /api/admin/users/:id/role` may manage student/instructor roles; admin creation is bootstrap-only |
 | **Account Activation/Deactivation** | ❌ | ❌ | ✅ | `PATCH /api/admin/users/:id/status` (Admin exclusive) |
 | **Platform System Analytics** | ❌ | ❌ | ✅ | `GET /api/admin/stats` (Admin exclusive) |
 
@@ -111,22 +107,37 @@ The curriculum features six subjects with structured learning units, 30 assessme
 
 ---
 
-### 2. Backend Setup & Seeding
+### 2. Backend Setup
 
 ```powershell
 # Navigate to the backend directory
 cd backend
 
-# Install dependencies
-npm install
+# Create local environment configuration and set a random JWT secret
+Copy-Item .env.example .env
+node -e "const fs=require('fs');const crypto=require('crypto');const p='.env';let s=fs.readFileSync(p,'utf8');s=s.replace(/^JWT_SECRET=.*$/m,'JWT_SECRET='+crypto.randomBytes(48).toString('base64url'));fs.writeFileSync(p,s);"
 
-# Seed the database with users, courses, 180 assessment questions, and 120 quiz questions
-npm run seed
+# Install locked dependencies
+npm ci
 
-# Run the backend server
-node src/server.js
+# Start the API
+npm run dev
 # Backend runs at: http://localhost:5000
 ```
+
+The seed command never creates accounts. To seed courses, first register an account, then grant it the instructor role using trusted MongoDB administrative access. Set `SEED_INSTRUCTOR_EMAIL` in `backend/.env` to that account's email and run `npm run seed`. **Seeding clears existing courses, lessons, assessments, quizzes, results, enrollments, progress, and notifications; it preserves user accounts.** On databases populated by older seed scripts, review and deactivate legacy sample accounts through trusted MongoDB access; the current seed intentionally preserves account records and their references.
+
+Set `ADMIN_EMAIL` in the ignored `backend/.env` to the one authorized address. The value is normalized (trimmed and case-insensitive) and is never sent to the frontend. The initial administrator registration must use the **Administrator** option, match this email, and complete email verification; administrator access is not granted during public registration. Configure SMTP first, then run the one-time bootstrap from a trusted backend terminal. It only promotes an active, verified account that made an administrator setup request, and refuses to run if any administrator already exists. In PowerShell:
+
+```powershell
+$env:ADMIN_EMAIL = Read-Host "Authorized administrator email"
+npm run bootstrap-admin --prefix backend
+Remove-Item Env:ADMIN_EMAIL
+```
+
+The bootstrap command reads `ADMIN_EMAIL` from `backend/.env`; the PowerShell assignment above is only needed if overriding it temporarily. The administrator signs in with the password set during registration; no default admin account or password is stored in source code. Administrator API access checks both the database role and the configured email. Additional admin grants through user-management APIs are rejected.
+
+For email verification, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `EMAIL_FROM` in the ignored `backend/.env` file, set `CLIENT_URL` to the frontend origin, and set `EMAIL_VERIFICATION_ENABLED=true`. Registration reports an error if verification is enabled without a complete SMTP configuration; no email is claimed to have been sent.
 
 ---
 
@@ -136,8 +147,8 @@ node src/server.js
 # Open a new terminal and navigate to the frontend directory
 cd frontend
 
-# Install dependencies
-npm install
+# Install locked dependencies
+npm ci
 
 # Start the Vite development server
 npm run dev
@@ -148,9 +159,9 @@ Open your browser and navigate to **[http://localhost:5173](http://localhost:517
 
 ---
 
-### 4. Running the Automated Integration Test Suite
+### 4. Running the Automated Integration Checks
 
-To verify all 21 system assertions across authentication, assessments, quizzes, results, and progress:
+With MongoDB and the backend running, execute the integration checks for registration, password hashing, login, role restrictions, logout, and existing course/assessment/quiz APIs:
 
 ```powershell
 cd backend
@@ -162,8 +173,10 @@ node test_portal.js
 ## 📡 REST API Documentation
 
 ### Authentication (`/api/auth`)
-- `POST /api/auth/register` - Register a student or instructor
-- `POST /api/auth/login` - Authenticate and retrieve JWT
+- `POST /api/auth/register` - Register a student account
+- `POST /api/auth/login` - Authenticate and set an HTTP-only JWT cookie
+- `POST /api/auth/logout` - Clear the authentication cookie
+- `POST /api/auth/verify-email` - Verify an expiring email token (when enabled)
 - `GET /api/auth/me` - Fetch profile of currently logged-in user
 - `PUT /api/auth/profile` - Update user profile and bio
 

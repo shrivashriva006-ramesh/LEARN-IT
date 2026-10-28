@@ -2,7 +2,7 @@ const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  console.error('[Error Details]:', err);
+  console.error('[API Error]:', err.name || 'Error', err.code || 'No error code');
 
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {

@@ -12,6 +12,8 @@ import {
   UserCheck,
   Search,
   Filter,
+  UserPlus,
+  UserX,
 } from 'lucide-react';
 import { User, Course } from '../types';
 
@@ -19,6 +21,7 @@ export const AdminDashboard: React.FC = () => {
   const { user } = useAuth();
   const [stats, setStats] = useState<any>(null);
   const [users, setUsers] = useState<User[]>([]);
+  const [instructorRequests, setInstructorRequests] = useState<User[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [search, setSearch] = useState<string>('');
   const [roleFilter, setRoleFilter] = useState<string>('All');
@@ -27,9 +30,10 @@ export const AdminDashboard: React.FC = () => {
   const fetchAdminData = async () => {
     try {
       setLoading(true);
-      const [statsRes, usersRes] = await Promise.all([
+      const [statsRes, usersRes, requestsRes] = await Promise.all([
         api.get('/admin/stats'),
         api.get('/admin/users'),
+        api.get('/admin/instructor-requests'),
       ]);
 
       if (statsRes.data.success) {
@@ -38,6 +42,9 @@ export const AdminDashboard: React.FC = () => {
 
       if (usersRes.data.success) {
         setUsers(usersRes.data.users || []);
+      }
+      if (requestsRes.data.success) {
+        setInstructorRequests(requestsRes.data.requests || []);
       }
     } catch (err) {
       console.error('Failed to load admin metrics:', err);
@@ -80,6 +87,27 @@ export const AdminDashboard: React.FC = () => {
           )
         );
         setActionMsg({ text: `User role updated to ${newRole}` });
+      }
+    } catch (err) {
+      setActionMsg({ text: getErrorMessage(err), error: true });
+    }
+  };
+
+  const handleInstructorRequest = async (userId: string, decision: 'approve' | 'reject') => {
+    try {
+      const res = await api.patch(`/admin/instructor-requests/${userId}`, { decision });
+      if (res.data.success) {
+        setInstructorRequests((prev) =>
+          prev.filter((request: any) => (request._id || request.id) !== userId)
+        );
+        setUsers((prev) =>
+          prev.map((existing: any) =>
+            (existing._id || existing.id) === userId
+              ? { ...existing, role: res.data.user.role, instructorRequestStatus: res.data.user.instructorRequestStatus }
+              : existing
+          )
+        );
+        setActionMsg({ text: res.data.message });
       }
     } catch (err) {
       setActionMsg({ text: getErrorMessage(err), error: true });
@@ -160,6 +188,55 @@ export const AdminDashboard: React.FC = () => {
           {actionMsg.text}
         </div>
       )}
+
+      <div className="card" style={{ marginBottom: '2rem' }}>
+        <div style={{ marginBottom: '1.25rem' }}>
+          <h3 className="card-title" style={{ margin: 0 }}>Instructor Access Requests</h3>
+          <p className="card-desc">Review requests before granting instructor permissions.</p>
+        </div>
+        {instructorRequests.length === 0 ? (
+          <p style={{ color: 'var(--text-muted)', margin: 0 }}>There are no pending instructor requests.</p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+            {instructorRequests.map((request: any) => {
+              const requestId = request._id || request.id;
+              return (
+                <div key={requestId} style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  flexWrap: 'wrap',
+                  gap: '1rem',
+                  padding: '1rem',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-md)',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: 'var(--text-main)' }}>{request.name}</div>
+                    <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{request.email}</div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleInstructorRequest(requestId, 'approve')}
+                    >
+                      <UserPlus size={14} /> Approve
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => handleInstructorRequest(requestId, 'reject')}
+                    >
+                      <UserX size={14} /> Reject
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Metrics Row */}
       <div className="grid-cols-4" style={{ marginBottom: '2rem' }}>

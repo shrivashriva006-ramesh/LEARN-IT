@@ -1,16 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import axios from 'axios';
 import api, { getErrorMessage } from '../services/api';
-import { User } from '../types';
+import { Role, User } from '../types';
 
 interface AuthContextType {
   user: User | null;
-  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<{ success: boolean; message?: string; user?: User }>;
-  register: (data: any) => Promise<{ success: boolean; message?: string; user?: User }>;
-  switchDemoRole: (role: 'student' | 'instructor' | 'admin') => Promise<User | null>;
-  logout: () => void;
+  register: (data: { name: string; email: string; password: string; confirmPassword: string; role: Role }) => Promise<{ success: boolean; message?: string }>;
+  logout: () => Promise<void>;
   updateUser: (updated: Partial<User>) => void;
   refreshUser: () => Promise<void>;
 }
@@ -18,33 +17,29 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const saved = localStorage.getItem('edtech_user');
-    return saved ? JSON.parse(saved) : null;
-  });
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('edtech_token'));
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Validate session on mount
   useEffect(() => {
     const checkAuth = async () => {
-      const storedToken = localStorage.getItem('edtech_token');
-      if (storedToken) {
-        try {
-          const res = await api.get('/auth/me');
-          if (res.data.success && res.data.user) {
-            setUser(res.data.user);
-            localStorage.setItem('edtech_user', JSON.stringify(res.data.user));
-          }
-        } catch (err) {
-          console.warn('Session expired or invalid, clearing authentication token.');
-          localStorage.removeItem('edtech_token');
-          localStorage.removeItem('edtech_user');
-          setUser(null);
-          setToken(null);
-        }
+      if (['/login', '/register', '/verify-email'].includes(window.location.pathname)) {
+        setIsLoading(false);
+        return;
       }
-      setIsLoading(false);
+
+      try {
+        const res = await api.get('/auth/me');
+        if (res.data.success && res.data.user) {
+          setUser(res.data.user);
+        }
+      } catch (err) {
+        setUser(null);
+        if (!axios.isAxiosError(err) || err.response?.status !== 401) {
+          console.error('Unable to validate the current authentication session:', getErrorMessage(err));
+        }
+      } finally {
+        setIsLoading(false);
+      }
     };
 
     checkAuth();
@@ -52,66 +47,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const login = async (email: string, password: string) => {
     try {
-      const res = await api.post('/auth/login', { email, password });
+      const res = await api.post('/auth/login', {
+        email: email.trim().toLowerCase(),
+        password,
+      });
       if (res.data.success) {
-        const { token: receivedToken, user: receivedUser } = res.data;
-        setToken(receivedToken);
+        const { user: receivedUser } = res.data;
         setUser(receivedUser);
-        localStorage.setItem('edtech_token', receivedToken);
-        localStorage.setItem('edtech_user', JSON.stringify(receivedUser));
         return { success: true, user: receivedUser };
       }
-      return { success: false, message: 'Login failed' };
+      return { success: false, message: res.data.message || 'Login failed' };
     } catch (err) {
       return { success: false, message: getErrorMessage(err) };
     }
   };
 
-  const switchDemoRole = async (role: 'student' | 'instructor' | 'admin') => {
-    const credentials = {
-      student: { email: 'student@edtech.com', password: 'Student@123' },
-      instructor: { email: 'instructor@edtech.com', password: 'Instructor@123' },
-      admin: { email: 'admin@edtech.com', password: 'Admin@123' },
-    };
-
-    const cred = credentials[role];
-    const res = await login(cred.email, cred.password);
-    if (res.success && res.user) {
-      return res.user;
-    }
-    return null;
-  };
-
-  const register = async (formData: any) => {
+  const register = async (formData: {
+    name: string;
+    email: string;
+    password: string;
+    confirmPassword: string;
+    role: Role;
+  }) => {
     try {
       const res = await api.post('/auth/register', formData);
       if (res.data.success) {
-        const { token: receivedToken, user: receivedUser } = res.data;
-        setToken(receivedToken);
-        setUser(receivedUser);
-        localStorage.setItem('edtech_token', receivedToken);
-        localStorage.setItem('edtech_user', JSON.stringify(receivedUser));
-        return { success: true };
+        return { success: true, message: res.data.message };
       }
-      return { success: false, message: 'Registration failed' };
+      return { success: false, message: res.data.message || 'Registration failed' };
     } catch (err) {
       return { success: false, message: getErrorMessage(err) };
     }
   };
 
-  const logout = () => {
-    setUser(null);
-    setToken(null);
-    localStorage.removeItem('edtech_token');
-    localStorage.removeItem('edtech_user');
-    window.location.href = '/login';
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch {
+      console.error('The server could not clear the authentication cookie during logout.');
+    } finally {
+      setUser(null);
+      window.location.href = '/login';
+    }
   };
 
   const updateUser = (updated: Partial<User>) => {
     if (user) {
       const newUser = { ...user, ...updated };
       setUser(newUser);
-      localStorage.setItem('edtech_user', JSON.stringify(newUser));
     }
   };
 
@@ -120,7 +103,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const res = await api.get('/auth/me');
       if (res.data.success && res.data.user) {
         setUser(res.data.user);
-        localStorage.setItem('edtech_user', JSON.stringify(res.data.user));
       }
     } catch (err) {
       console.error('Failed to refresh user:', err);
@@ -131,12 +113,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider
       value={{
         user,
-        token,
-        isAuthenticated: !!user && !!token,
+        isAuthenticated: !!user,
         isLoading,
         login,
         register,
-        switchDemoRole,
         logout,
         updateUser,
         refreshUser,

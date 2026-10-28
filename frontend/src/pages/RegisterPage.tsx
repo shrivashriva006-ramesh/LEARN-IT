@@ -1,29 +1,36 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { GraduationCap, Lock, Mail, User, ArrowRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { GraduationCap, Lock, Mail, User, ArrowRight, AlertCircle, CheckCircle, BookOpen, Award, Shield } from 'lucide-react';
+import { Role } from '../types';
 
 export const RegisterPage: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<'student' | 'instructor'>('student');
+  const [role, setRole] = useState<Role>('student');
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { register } = useAuth();
-  const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+    setSuccess('');
+
+    if (role === 'admin') {
+      setError('Administrator accounts can only be created through the authorized setup process.');
+      return;
+    }
 
     if (!name.trim()) {
       setError('Please provide your full name.');
       return;
     }
 
-    const emailRegex = /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/;
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     if (!emailRegex.test(email)) {
       setError('Please provide a valid email address.');
       return;
@@ -50,7 +57,9 @@ export const RegisterPage: React.FC = () => {
     setIsSubmitting(false);
 
     if (res.success) {
-      navigate('/dashboard');
+      setSuccess(res.message || 'Registration successful. You can now sign in.');
+      setPassword('');
+      setConfirmPassword('');
     } else {
       setError(res.message || 'Registration failed. Please try again.');
     }
@@ -111,6 +120,12 @@ export const RegisterPage: React.FC = () => {
             <div>{error}</div>
           </div>
         )}
+        {success && (
+          <div className="alert alert-success" role="status">
+            <CheckCircle size={18} style={{ flexShrink: 0, marginTop: '2px' }} />
+            <div>{success}</div>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
@@ -139,7 +154,7 @@ export const RegisterPage: React.FC = () => {
                 type="email"
                 className="form-input"
                 style={{ paddingLeft: '2.75rem' }}
-                placeholder="e.g. shriva@edtech.com"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -147,56 +162,59 @@ export const RegisterPage: React.FC = () => {
             </div>
           </div>
 
-          {/* Account Role Selection */}
           <div className="form-group">
             <label className="form-label">Register As</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
-              <button
-                type="button"
-                onClick={() => setRole('student')}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: `2px solid ${role === 'student' ? 'var(--primary)' : 'var(--border)'}`,
-                  backgroundColor: role === 'student' ? 'var(--primary-light)' : '#FFFFFF',
-                  color: role === 'student' ? 'var(--primary)' : 'var(--text-main)',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <span>Student</span>
-                {role === 'student' && <CheckCircle size={16} />}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRole('instructor')}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-md)',
-                  border: `2px solid ${role === 'instructor' ? 'var(--accent)' : 'var(--border)'}`,
-                  backgroundColor: role === 'instructor' ? 'var(--accent-light)' : '#FFFFFF',
-                  color: role === 'instructor' ? 'var(--accent)' : 'var(--text-main)',
-                  fontWeight: 600,
-                  fontSize: '0.9rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '0.5rem',
-                  transition: 'all 0.2s',
-                }}
-              >
-                <span>Instructor</span>
-                {role === 'instructor' && <CheckCircle size={16} />}
-              </button>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(105px, 1fr))',
+              gap: '0.6rem',
+            }}>
+              {([
+                { value: 'student', label: 'Student', Icon: BookOpen },
+                { value: 'instructor', label: 'Instructor', Icon: Award },
+                { value: 'admin', label: 'Administrator', Icon: Shield },
+              ] as const).map(({ value, label, Icon }) => {
+                const isSelected = role === value;
+                return (
+                  <button
+                    key={value}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      setRole(value);
+                      setError('');
+                      setSuccess('');
+                    }}
+                    style={{
+                      minWidth: 0,
+                      padding: '0.75rem 0.4rem',
+                      borderRadius: 'var(--radius-md)',
+                      border: `1.5px solid ${isSelected ? 'var(--primary)' : 'var(--border)'}`,
+                      backgroundColor: isSelected ? 'var(--primary-light)' : '#FFFFFF',
+                      color: isSelected ? 'var(--primary)' : 'var(--text-muted)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '0.35rem',
+                      fontSize: '0.8rem',
+                      fontWeight: isSelected ? 700 : 600,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    <Icon size={18} />
+                    <span>{label}</span>
+                  </button>
+                );
+              })}
             </div>
-            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.35rem' }}>
-              * Admin registration is restricted to system administrators.
+            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '0.4rem' }}>
+              {role === 'instructor'
+                ? 'Instructor access requires approval by an authorized administrator.'
+                : role === 'admin'
+                  ? 'Administrator access requires the authorized setup process.'
+                  : 'Student access is available immediately after registration.'}
             </div>
           </div>
 
@@ -255,9 +273,9 @@ export const RegisterPage: React.FC = () => {
         </form>
 
         <div style={{ marginTop: '1.75rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-          Already have an account?{' '}
+          {success ? 'Registration complete. ' : 'Already have an account? '}
           <Link to="/login" style={{ color: 'var(--primary)', fontWeight: 700 }}>
-            Sign in here
+            {success ? 'Sign in now' : 'Sign in here'}
           </Link>
         </div>
       </div>

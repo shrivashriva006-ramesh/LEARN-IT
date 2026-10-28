@@ -20,7 +20,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }) => {
-  const { user, logout, switchDemoRole } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [showNotifications, setShowNotifications] = useState<boolean>(false);
@@ -276,75 +276,6 @@ export const Navbar: React.FC<NavbarProps> = ({ onToggleSidebar, isSidebarOpen }
                   </div>
                 </div>
               )}
-            </div>
-
-            {/* Instant Demo Role Switcher for seamless evaluation & review */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              backgroundColor: '#F1F5F9',
-              borderRadius: 'var(--radius-full)',
-              padding: '0.2rem',
-              gap: '0.2rem',
-              border: '1px solid var(--border)'
-            }}>
-              <span style={{ fontSize: '0.7rem', fontWeight: 700, color: 'var(--text-muted)', padding: '0 0.5rem', textTransform: 'uppercase' }}>
-                Role:
-              </span>
-              <button
-                onClick={async () => {
-                  const u = await switchDemoRole('student');
-                  if (u) navigate('/dashboard');
-                }}
-                style={{
-                  padding: '0.25rem 0.65rem',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '0.75rem',
-                  fontWeight: user.role === 'student' ? 700 : 500,
-                  backgroundColor: user.role === 'student' ? 'var(--primary)' : 'transparent',
-                  color: user.role === 'student' ? '#FFFFFF' : 'var(--text-main)',
-                  transition: 'all 0.15s'
-                }}
-                title="Switch to Student account"
-              >
-                🎓 Student
-              </button>
-              <button
-                onClick={async () => {
-                  const u = await switchDemoRole('instructor');
-                  if (u) navigate('/instructor/dashboard');
-                }}
-                style={{
-                  padding: '0.25rem 0.65rem',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '0.75rem',
-                  fontWeight: user.role === 'instructor' ? 700 : 500,
-                  backgroundColor: user.role === 'instructor' ? 'var(--accent)' : 'transparent',
-                  color: user.role === 'instructor' ? '#FFFFFF' : 'var(--text-main)',
-                  transition: 'all 0.15s'
-                }}
-                title="Switch to Instructor account"
-              >
-                👨‍🏫 Instructor
-              </button>
-              <button
-                onClick={async () => {
-                  const u = await switchDemoRole('admin');
-                  if (u) navigate('/admin/dashboard');
-                }}
-                style={{
-                  padding: '0.25rem 0.65rem',
-                  borderRadius: 'var(--radius-full)',
-                  fontSize: '0.75rem',
-                  fontWeight: user.role === 'admin' ? 700 : 500,
-                  backgroundColor: user.role === 'admin' ? 'var(--danger)' : 'transparent',
-                  color: user.role === 'admin' ? '#FFFFFF' : 'var(--text-main)',
-                  transition: 'all 0.15s'
-                }}
-                title="Switch to Administrator account"
-              >
-                🛡️ Admin
-              </button>
             </div>
 
             {/* Quick link to Role Guide */}

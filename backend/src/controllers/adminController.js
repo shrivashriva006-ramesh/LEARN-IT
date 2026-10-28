@@ -82,6 +82,65 @@ exports.getAllUsers = async (req, res, next) => {
   }
 };
 
+// @desc    List pending instructor role requests
+// @route   GET /api/admin/instructor-requests
+// @access  Private (Admin)
+exports.getInstructorRequests = async (req, res, next) => {
+  try {
+    const requests = await User.find({ instructorRequestStatus: 'pending' })
+      .sort({ createdAt: 1 })
+      .select('name email role status instructorRequestStatus createdAt');
+    res.status(200).json({ success: true, requests });
+  } catch (err) {
+    next(err);
+  }
+};
+
+// @desc    Approve or reject an instructor role request
+// @route   PATCH /api/admin/instructor-requests/:id
+// @access  Private (Admin)
+exports.reviewInstructorRequest = async (req, res, next) => {
+  try {
+    const { decision } = req.body;
+    if (!['approve', 'reject'].includes(decision)) {
+      return res.status(400).json({ success: false, message: 'Decision must be approve or reject' });
+    }
+
+    const user = await User.findOne({
+      _id: req.params.id,
+      role: 'student',
+      instructorRequestStatus: 'pending',
+    });
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Pending instructor request not found',
+      });
+    }
+
+    user.instructorRequestStatus = decision === 'approve' ? 'approved' : 'rejected';
+    if (decision === 'approve') user.role = 'instructor';
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: decision === 'approve'
+        ? 'Instructor request approved'
+        : 'Instructor request rejected',
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        status: user.status,
+        instructorRequestStatus: user.instructorRequestStatus,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Update user role
 // @route   PATCH /api/admin/users/:id/role
 // @access  Private (Admin)
@@ -92,9 +151,19 @@ exports.updateUserRole = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid role' });
     }
 
+    if (role === 'admin') {
+      return res.status(403).json({
+        success: false,
+        message: 'Administrator access can only be granted through the secure bootstrap process.',
+      });
+    }
+
     const user = await User.findByIdAndUpdate(
       req.params.id,
-      { role },
+      {
+        role,
+        ...(role === 'instructor' ? { instructorRequestStatus: 'approved' } : {}),
+      },
       { new: true, runValidators: true }
     ).select('-password');
 

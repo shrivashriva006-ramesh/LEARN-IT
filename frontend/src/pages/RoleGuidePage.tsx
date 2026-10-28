@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
   ShieldAlert,
@@ -59,7 +58,7 @@ const Cross = () => (
 // ─── Matrix data ─────────────────────────────────────────────────────────────
 
 const MATRIX = [
-  { feature: 'Self-Registration (Public)',              student: true,  instructor: true,  admin: false, note: 'Admin accounts can only be seeded or created by another admin.' },
+  { feature: 'Self-Registration (Public)',              student: true,  instructor: false, admin: false, note: 'Public registration always creates a student account; elevated roles are assigned by an administrator.' },
   { feature: 'Browse Published Course Catalog',         student: true,  instructor: true,  admin: true,  note: 'All authenticated roles can view the 6 core subjects.' },
   { feature: 'Enroll in a Course',                      student: true,  instructor: false, admin: false, note: 'Enrollment is a student-only action.' },
   { feature: 'Watch Video Lectures',                    student: true,  instructor: true,  admin: true,  note: 'Content readable by all roles.' },
@@ -92,7 +91,7 @@ const WORKFLOWS: Record<Role, { step: number; title: string; desc: string; icon:
     { step: 7, title: 'Track Progress',           icon: TrendingUp,     desc: 'Check auto-calculated progress bars: lessons 60%, assess 20%, quiz 20%.', exclusive: true },
   ],
   instructor: [
-    { step: 1, title: 'Login as Instructor',      icon: UserCheck,      desc: 'Use instructor@edtech.com — routed to Faculty Dashboard.' },
+    { step: 1, title: 'Login as Instructor',      icon: UserCheck,      desc: 'Sign in with an instructor account provisioned by an administrator.' },
     { step: 2, title: 'Create Course',            icon: Edit,           desc: 'Open the "+ New Course" modal, set title, category, level.', exclusive: true },
     { step: 3, title: 'Publish / Unpublish',      icon: Eye,            desc: 'Toggle course visibility: draft hidden from students, published visible.', exclusive: true },
     { step: 4, title: 'Review Course Catalog',    icon: BookOpen,       desc: 'Browse all published and draft courses in the platform.' },
@@ -101,7 +100,7 @@ const WORKFLOWS: Record<Role, { step: number; title: string; desc: string; icon:
     { step: 7, title: 'Access Content & Exams',   icon: PlayCircle,     desc: 'Watch lectures, read notes and take assessments/quizzes yourself.' },
   ],
   admin: [
-    { step: 1, title: 'Login as Admin',           icon: UserCheck,      desc: 'Use admin@edtech.com — JWT contains role:admin, routed to Admin Dashboard.' },
+    { step: 1, title: 'Login as Admin',           icon: UserCheck,      desc: 'Sign in with an administrator account provisioned through trusted database access.' },
     { step: 2, title: 'Platform Metrics',         icon: BarChart2,      desc: 'View total users, instructors, courses, and pass rates.', exclusive: true },
     { step: 3, title: 'User Roster Audit',        icon: Users,          desc: 'Search and filter all registered accounts by role or name.', exclusive: true },
     { step: 4, title: 'Role Management',          icon: Settings,       desc: 'Promote / demote any user: Student ⇄ Instructor ⇄ Admin in one click.', exclusive: true },
@@ -114,18 +113,8 @@ const WORKFLOWS: Record<Role, { step: number; title: string; desc: string; icon:
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const RoleGuidePage: React.FC = () => {
-  const { user, switchDemoRole } = useAuth();
-  const navigate = useNavigate();
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<'overview' | 'workflows' | 'matrix'>('overview');
-
-  const handleSwitch = async (role: Role) => {
-    const updatedUser = await switchDemoRole(role);
-    if (updatedUser) {
-      if (role === 'admin') navigate('/admin/dashboard');
-      else if (role === 'instructor') navigate('/instructor/dashboard');
-      else navigate('/dashboard');
-    }
-  };
 
   const currentRole = (user?.role as Role) || 'student';
   const currentColor = ROLE_COLORS[currentRole];
@@ -264,16 +253,15 @@ export const RoleGuidePage: React.FC = () => {
                       : 'Full governance: manage all user accounts, assign/revoke roles, activate/deactivate accounts, and monitor platform analytics.'}
                   </p>
 
-                  {/* Credentials */}
+                  {/* Role assignment */}
                   <div style={{
                     backgroundColor: '#F8FAFC', border: '1px solid var(--border)',
                     borderRadius: 'var(--radius-md)', padding: '0.75rem', marginBottom: '1rem', fontSize: '0.8rem',
                   }}>
-                    <div style={{ fontWeight: 700, marginBottom: '0.35rem' }}>Demo Credentials</div>
-                    <div>📧 <code style={{ color: rc.primary }}>{role}@edtech.com</code></div>
-                    <div style={{ marginTop: '0.2rem' }}>🔑 <code>{role === 'student' ? 'Student' : role === 'instructor' ? 'Instructor' : 'Admin'}@123</code></div>
+                    <div style={{ fontWeight: 700, marginBottom: '0.35rem' }}>Account access</div>
+                    <div>{role === 'student' ? 'Available through public registration.' : 'Role assigned by an authorized administrator.'}</div>
                     <div style={{ marginTop: '0.4rem', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                      Auto-redirect → <strong>{role === 'admin' ? '/admin/dashboard' : role === 'instructor' ? '/instructor/dashboard' : '/dashboard'}</strong>
+                      After sign-in → <strong>{role === 'admin' ? '/admin/dashboard' : role === 'instructor' ? '/instructor/dashboard' : '/dashboard'}</strong>
                     </div>
                   </div>
 
@@ -303,19 +291,15 @@ export const RoleGuidePage: React.FC = () => {
                     ))}
                   </div>
 
-                  <button
-                    onClick={() => handleSwitch(role)}
-                    style={{
-                      width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)',
-                      fontWeight: 700, fontSize: '0.875rem', cursor: 'pointer',
-                      backgroundColor: isActive ? rc.light : rc.primary,
-                      color: isActive ? rc.primary : '#FFFFFF',
-                      border: `2px solid ${rc.primary}`,
-                      transition: 'all 0.2s',
-                    }}
-                  >
-                    {isActive ? `✓ Currently ${rc.label}` : `Switch to ${rc.label} →`}
-                  </button>
+                  <div style={{
+                    width: '100%', padding: '0.65rem', borderRadius: 'var(--radius-md)',
+                    fontWeight: 700, fontSize: '0.875rem', textAlign: 'center',
+                    backgroundColor: isActive ? rc.light : '#F8FAFC',
+                    color: rc.primary,
+                    border: `1px solid ${rc.primary}50`,
+                  }}>
+                    {isActive ? `✓ Currently ${rc.label}` : `${rc.label} permissions`}
+                  </div>
                 </div>
               );
             })}

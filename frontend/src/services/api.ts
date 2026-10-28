@@ -2,34 +2,19 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-// Request interceptor to automatically attach JWT token
-api.interceptors.request.use(
-  (config) => {
-    const token = localStorage.getItem('edtech_token');
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    return config;
-  },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor to handle unauthorized access
+// Redirect protected views when the server rejects the current session.
 api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response && error.response.status === 401) {
-      // Token expired or invalid
-      // Only clear if on protected page
       const currentPath = window.location.pathname;
       if (currentPath !== '/login' && currentPath !== '/register') {
-        localStorage.removeItem('edtech_token');
-        localStorage.removeItem('edtech_user');
         window.location.href = '/login';
       }
     }

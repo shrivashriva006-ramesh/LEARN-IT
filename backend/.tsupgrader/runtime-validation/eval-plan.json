@@ -1,0 +1,57 @@
+{
+  "generatedAt": "2026-10-28T23:40:00+05:30",
+  "generatedOnPlatform": "win32",
+  "projectType": "server",
+  "devServer": {
+    "command": "npm",
+    "args": ["run", "start"],
+    "env": {
+      "PORT": "5517"
+    },
+    "url": "http://127.0.0.1:5517/api/health",
+    "readyTimeoutSeconds": 60
+  },
+  "setup": [
+    {
+      "command": "npm",
+      "args": ["ci"],
+      "timeoutSeconds": 600
+    }
+  ],
+  "assertions": [
+    {
+      "name": "backend-syntax",
+      "kind": "process",
+      "command": "node",
+      "args": ["--check", "src/server.js"],
+      "verificationMethod": "exit-code",
+      "expected": "0",
+      "timeoutSeconds": 30
+    },
+    {
+      "name": "api-health-200",
+      "kind": "http-probe",
+      "startCommand": "npm",
+      "startArgs": ["run", "start"],
+      "env": {
+        "PORT": "5518"
+      },
+      "url": "http://127.0.0.1:5518/api/health",
+      "verificationMethod": "http-status",
+      "expected": "200",
+      "timeoutSeconds": 60
+    },
+    {
+      "name": "tests-pass",
+      "kind": "process",
+      "command": "npm",
+      "args": ["test"],
+      "env": {
+        "PORT": "5517"
+      },
+      "verificationMethod": "test-results",
+      "expected": "0",
+      "timeoutSeconds": 180
+    }
+  ]
+}

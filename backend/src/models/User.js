@@ -16,7 +16,7 @@ const userSchema = new mongoose.Schema(
       lowercase: true,
       trim: true,
       match: [
-        /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
+        /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/,
         'Please provide a valid email address',
       ],
     },
@@ -31,10 +31,32 @@ const userSchema = new mongoose.Schema(
       enum: ['student', 'instructor', 'admin'],
       default: 'student',
     },
+    instructorRequestStatus: {
+      type: String,
+      enum: ['none', 'pending', 'approved', 'rejected'],
+      default: 'none',
+    },
+    adminRegistrationRequested: {
+      type: Boolean,
+      default: false,
+      select: false,
+    },
     status: {
       type: String,
       enum: ['active', 'inactive'],
       default: 'active',
+    },
+    emailVerified: {
+      type: Boolean,
+      default: true,
+    },
+    emailVerificationTokenHash: {
+      type: String,
+      select: false,
+    },
+    emailVerificationExpiresAt: {
+      type: Date,
+      select: false,
     },
     avatar: {
       type: String,
@@ -46,6 +68,15 @@ const userSchema = new mongoose.Schema(
     },
   },
   { timestamps: true }
+);
+
+userSchema.index(
+  { role: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { role: 'admin' },
+    name: 'unique_admin_role',
+  }
 );
 
 // Hash password before saving

@@ -1,346 +1,358 @@
 const http = require('http');
+const crypto = require('crypto');
+const dotenv = require('dotenv');
+const mongoose = require('mongoose');
+const bcrypt = require('bcryptjs');
+const path = require('path');
 
-function request(options, postData) {
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+const User = require('./src/models/User');
+const port = Number(process.env.PORT || 5000);
+const email = `learn-it-test-${Date.now()}@example.test`;
+const verificationEmail = `learn-it-verify-${Date.now()}@example.test`;
+const instructorEmail = `learn-it-instructor-${Date.now()}@example.test`;
+const adminEmail = (process.env.TEST_ADMIN_EMAIL || `learn-it-admin-${Date.now()}@example.test`)
+  .trim()
+  .toLowerCase();
+const configuredAdminEmail = (process.env.ADMIN_EMAIL || '').trim().toLowerCase();
+const canTestAuthorizedAdmin = Boolean(configuredAdminEmail) && configuredAdminEmail === adminEmail;
+const unauthorizedAdminEmail = `learn-it-unauthorized-admin-${Date.now()}@example.test`;
+const password = 'Integration-Test-Passphrase-742!';
+let passed = 0;
+let total = 0;
+
+function request(method, route, body, cookie) {
   return new Promise((resolve, reject) => {
-    const req = http.request(options, (res) => {
-      let body = '';
-      res.on('data', (chunk) => (body += chunk));
-      res.on('end', () => {
-        try {
-          resolve({ status: res.statusCode, data: JSON.parse(body) });
-        } catch (e) {
-          resolve({ status: res.statusCode, raw: body });
-        }
-      });
-    });
+    const data = body ? JSON.stringify(body) : '';
+    const req = http.request(
+      {
+        hostname: '127.0.0.1',
+        port,
+        path: `/api${route}`,
+        method,
+        headers: {
+          ...(body ? {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(data),
+          } : {}),
+          ...(cookie ? { Cookie: cookie } : {}),
+        },
+      },
+      (res) => {
+        let responseBody = '';
+        res.on('data', (chunk) => { responseBody += chunk; });
+        res.on('end', () => {
+          let parsedBody;
+          try {
+            parsedBody = JSON.parse(responseBody);
+          } catch {
+            parsedBody = {};
+          }
+          resolve({ status: res.statusCode, data: parsedBody, headers: res.headers });
+        });
+      }
+    );
     req.on('error', reject);
-    if (postData) {
-      req.write(JSON.stringify(postData));
-    }
+    if (data) req.write(data);
     req.end();
   });
 }
 
-async function runTests() {
-  console.log('========================================================');
-  console.log(' ED TECH PORTAL - FULL-STACK INTEGRATION TEST SUITE');
-  console.log('========================================================\n');
-
-  let passed = 0;
-  let total = 0;
-
-  function assert(condition, testName) {
-    total++;
-    if (condition) {
-      console.log(`[PASS] ${testName}`);
-      passed++;
-    } else {
-      console.error(`[FAIL] ${testName}`);
-    }
+function assert(condition, description) {
+  total += 1;
+  if (condition) {
+    passed += 1;
+    console.log(`[PASS] ${description}`);
+  } else {
+    console.error(`[FAIL] ${description}`);
   }
-
-  // 1. Health check
-  const health = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/health',
-    method: 'GET',
-  });
-  assert(health.status === 200 && health.data.status === 'success', 'API Health Check');
-
-  // 2. Student Login
-  const studentLogin = await request(
-    {
-      hostname: 'localhost',
-      port: 5000,
-      path: '/api/auth/login',
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    },
-    { email: 'student@edtech.com', password: 'Student@123' }
-  );
-  assert(studentLogin.status === 200 && studentLogin.data.token, 'Student Authentication');
-  const studentToken = studentLogin.data.token;
-
-  // 3. Instructor Login
-  const instLogin = await request(
-    {
-      hostname: 'localhost',
-      port: 5000,
-      path: '/api/auth/login',
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    },
-    { email: 'instructor@edtech.com', password: 'Instructor@123' }
-  );
-  assert(instLogin.status === 200 && instLogin.data.user.role === 'instructor', 'Instructor Authentication');
-  const instToken = instLogin.data.token;
-
-  // 4. Admin Login
-  const adminLogin = await request(
-    {
-      hostname: 'localhost',
-      port: 5000,
-      path: '/api/auth/login',
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-    },
-    { email: 'admin@edtech.com', password: 'Admin@123' }
-  );
-  assert(adminLogin.status === 200 && adminLogin.data.user.role === 'admin', 'Admin Authentication');
-  const adminToken = adminLogin.data.token;
-
-  // 5. Fetch Courses
-  const coursesRes = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/courses',
-    method: 'GET',
-  });
-  assert(
-    coursesRes.status === 200 && coursesRes.data.courses.length === 6,
-    'Retrieve exactly 6 technical courses'
-  );
-
-  const courseList = coursesRes.data.courses;
-  const courseNames = courseList.map((c) => c.title);
-  assert(
-    courseNames.includes('Java Programming') &&
-      courseNames.includes('Web Development') &&
-      courseNames.includes('Database Management') &&
-      courseNames.includes('Cyber Security') &&
-      courseNames.includes('Cloud Computing') &&
-      courseNames.includes('Python Programming'),
-    'All 6 exact required subjects present'
-  );
-
-  // 6. Fetch Assessments
-  const assessRes = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/assessments',
-    method: 'GET',
-  });
-  assert(
-    assessRes.status === 200 && assessRes.data.assessments.length === 6,
-    'Retrieve exactly 6 subject assessments'
-  );
-
-  // 7. Test single assessment questions count and answer security
-  const firstAssessmentId = assessRes.data.assessments[0]._id;
-  const singleAssessRes = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: `/api/assessments/${firstAssessmentId}`,
-    method: 'GET',
-    headers: { Authorization: `Bearer ${studentToken}` },
-  });
-  assert(
-    singleAssessRes.status === 200 &&
-      singleAssessRes.data.assessment.questions.length === 30,
-    'Assessment contains exactly 30 questions (Subject 1)'
-  );
-
-  // Verify answer security: correctAnswer is not exposed to student
-  const hasExposedAnswer = singleAssessRes.data.assessment.questions.some(
-    (q) => q.correctAnswer !== undefined
-  );
-  assert(!hasExposedAnswer, 'Security check: Correct answers are NOT exposed in public student API');
-
-  // Verify all 6 assessments have exactly 30 questions
-  let all30Assess = true;
-  for (const a of assessRes.data.assessments) {
-    const r = await request({
-      hostname: 'localhost',
-      port: 5000,
-      path: `/api/assessments/${a._id}`,
-      method: 'GET',
-      headers: { Authorization: `Bearer ${studentToken}` },
-    });
-    if (r.data.assessment.questions.length !== 30) {
-      all30Assess = false;
-    }
-  }
-  assert(all30Assess, 'VERIFIED: All 6 subjects contain EXACTLY 30 assessment questions (180 Total)');
-
-  // 8. Fetch Quizzes
-  const quizzesRes = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/quizzes',
-    method: 'GET',
-  });
-  assert(
-    quizzesRes.status === 200 && quizzesRes.data.quizzes.length === 6,
-    'Retrieve exactly 6 speed quizzes'
-  );
-
-  // Verify all 6 quizzes have exactly 20 questions
-  let all20Quiz = true;
-  for (const q of quizzesRes.data.quizzes) {
-    const r = await request({
-      hostname: 'localhost',
-      port: 5000,
-      path: `/api/quizzes/${q._id}`,
-      method: 'GET',
-      headers: { Authorization: `Bearer ${studentToken}` },
-    });
-    if (r.data.quiz.questions.length !== 20) {
-      all20Quiz = false;
-    }
-  }
-  assert(all20Quiz, 'VERIFIED: All 6 subjects contain EXACTLY 20 quiz questions (120 Total)');
-
-  // 9. Submit Assessment Attempt
-  const submitAssessRes = await request(
-    {
-      hostname: 'localhost',
-      port: 5000,
-      path: `/api/assessments/${firstAssessmentId}/submit`,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${studentToken}`,
-      },
-    },
-    {
-      answers: { 1: 1, 2: 2, 3: 1, 4: 1, 5: 2 },
-      timeSpentSeconds: 320,
-    }
-  );
-  assert(
-    submitAssessRes.status === 201 &&
-      submitAssessRes.data.result.score !== undefined &&
-      submitAssessRes.data.result.answersSummary.length === 30,
-    'Server-side assessment evaluation & solution breakdown'
-  );
-
-  // 10. Submit Quiz Attempt
-  const firstQuizId = quizzesRes.data.quizzes[0]._id;
-  const submitQuizRes = await request(
-    {
-      hostname: 'localhost',
-      port: 5000,
-      path: `/api/quizzes/${firstQuizId}/submit`,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${studentToken}`,
-      },
-    },
-    {
-      answers: { 1: 1, 2: 1, 3: 2 },
-      timeSpentSeconds: 150,
-      timedOut: false,
-    }
-  );
-  assert(
-    submitQuizRes.status === 201 && submitQuizRes.data.result.score !== undefined,
-    'Server-side quiz evaluation & scoring'
-  );
-
-  // 11. Fetch Results
-  const resultsRes = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/results/my-results',
-    method: 'GET',
-    headers: { Authorization: `Bearer ${studentToken}` },
-  });
-  assert(
-    resultsRes.status === 200 && resultsRes.data.results.length >= 2,
-    'My Results history returns persistent student records'
-  );
-
-  // 12. Fetch Dynamic Progress
-  const progressRes = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/progress/my-progress',
-    method: 'GET',
-    headers: { Authorization: `Bearer ${studentToken}` },
-  });
-  assert(
-    progressRes.status === 200 &&
-      progressRes.data.overallPercentage >= 0 &&
-      progressRes.data.progressList.length === 6,
-    'Dynamic course-wise progress and analytics calculated from database'
-  );
-
-  // 13. Test Lesson Progress Toggle
-  const firstCourseLessons = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: `/api/lessons?courseId=${courseList[0]._id}`,
-    method: 'GET',
-  });
-  const firstLessonId = firstCourseLessons.data.lessons[0]._id;
-  const toggleLesson = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: `/api/progress/${firstLessonId}`,
-    method: 'PATCH',
-    headers: { Authorization: `Bearer ${studentToken}` },
-  });
-  assert(
-    toggleLesson.status === 200 && toggleLesson.data.completionPercentage !== undefined,
-    'Lesson completion toggle updates real-time progress percentage'
-  );
-
-  // 14. Instructor Dashboard Stats
-  const instructorStats = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/instructor/stats',
-    method: 'GET',
-    headers: { Authorization: `Bearer ${instToken}` },
-  });
-  assert(
-    instructorStats.status === 200 && instructorStats.data.stats.totalCourses >= 1,
-    'Instructor Dashboard metrics endpoint'
-  );
-
-  // 15. Admin Dashboard Stats & User Management
-  const adminStats = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/admin/stats',
-    method: 'GET',
-    headers: { Authorization: `Bearer ${adminToken}` },
-  });
-  assert(
-    adminStats.status === 200 && adminStats.data.stats.totalStudents >= 1,
-    'Admin Dashboard platform metrics endpoint'
-  );
-
-  const adminUsers = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/admin/users',
-    method: 'GET',
-    headers: { Authorization: `Bearer ${adminToken}` },
-  });
-  assert(
-    adminUsers.status === 200 && adminUsers.data.users.length >= 3,
-    'Admin User Management returns registered accounts'
-  );
-
-  // 16. Notifications
-  const notifRes = await request({
-    hostname: 'localhost',
-    port: 5000,
-    path: '/api/notifications',
-    method: 'GET',
-    headers: { Authorization: `Bearer ${studentToken}` },
-  });
-  assert(
-    notifRes.status === 200 && notifRes.data.notifications.length >= 1,
-    'Notifications retrieval with unread tracking'
-  );
-
-  console.log('\n========================================================');
-  console.log(` RESULTS: ${passed}/${total} TESTS PASSED`);
-  console.log('========================================================');
 }
 
-runTests();
+async function runTests() {
+  try {
+    await mongoose.connect(process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/edtech_learning_portal');
+    await User.init();
+
+    const health = await request('GET', '/health');
+    assert(health.status === 200 && health.data.status === 'success', 'API health check');
+
+    const invalidEmail = await request('POST', '/auth/register', {
+      name: 'Integration Test',
+      email: 'not-an-email',
+      password,
+      confirmPassword: password,
+    });
+    assert(invalidEmail.status === 400, 'Reject invalid email registration');
+
+    const elevatedRegistration = await request('POST', '/auth/register', {
+      name: 'Integration Test',
+      email,
+      password,
+      confirmPassword: password,
+      role: 'admin',
+    });
+    assert(
+      elevatedRegistration.status === (configuredAdminEmail ? 403 : 503),
+      'Reject elevated role in public registration'
+    );
+
+    const instructorRequest = await request('POST', '/auth/register', {
+      name: 'Integration Instructor Request',
+      email: instructorEmail,
+      password,
+      confirmPassword: password,
+      role: 'instructor',
+    });
+    const pendingInstructor = await User.findOne({ email: instructorEmail });
+    assert(
+      instructorRequest.status === 201 &&
+      pendingInstructor?.role === 'student' &&
+      pendingInstructor?.instructorRequestStatus === 'pending',
+      'Instructor registration creates a student account with a pending request'
+    );
+
+    const adminRegistration = await request('POST', '/auth/register', {
+      name: 'Unauthorized Admin Request',
+      email: unauthorizedAdminEmail,
+      password,
+      confirmPassword: password,
+      role: 'admin',
+    });
+    assert(
+      adminRegistration.status === (configuredAdminEmail ? 403 : 503) &&
+      (!configuredAdminEmail ||
+        adminRegistration.data.message === 'Administrator registration is restricted to the authorized email address.'),
+      'Reject administrator registration from an unauthorized or unconfigured email'
+    );
+
+    const registration = await request('POST', '/auth/register', {
+      name: 'Integration Test Student',
+      email,
+      password,
+      confirmPassword: password,
+    });
+    assert(registration.status === 201, 'Register a new student account');
+    assert(!registration.headers['set-cookie'], 'Registration does not automatically create a login session');
+
+    const duplicateRegistration = await request('POST', '/auth/register', {
+      name: 'Integration Test Student',
+      email,
+      password,
+      confirmPassword: password,
+    });
+    assert(duplicateRegistration.status === 409, 'Reject duplicate email registration');
+
+    const pendingInstructorLogin = await request('POST', '/auth/login', {
+      email: instructorEmail,
+      password,
+    });
+    assert(
+      pendingInstructorLogin.status === 200 &&
+      pendingInstructorLogin.data.user.role === 'student',
+      'Pending instructor request does not grant instructor login role'
+    );
+
+    const studentSelectingInstructor = await request('POST', '/auth/login', {
+      email,
+      password,
+    });
+    const studentCookie = studentSelectingInstructor.headers['set-cookie']
+      ?.find((value) => value.startsWith('edtech_token='))
+      ?.split(';')[0];
+    assert(studentSelectingInstructor.status === 200 && studentSelectingInstructor.data.user.role === 'student', 'Authenticate students from their stored database role');
+
+    const unauthenticatedAdminAccess = await request('GET', '/admin/stats');
+    assert(unauthenticatedAdminAccess.status === 401, 'Reject unauthenticated administrator API requests');
+
+    if (canTestAuthorizedAdmin) {
+      if (!process.env.SMTP_HOST) {
+        const authorizedAdminRegistration = await request('POST', '/auth/register', {
+          name: 'Integration Administrator Request',
+          email: adminEmail,
+          password,
+          confirmPassword: password,
+          role: 'admin',
+        });
+        assert(
+          authorizedAdminRegistration.status === 503 &&
+          !(await User.exists({ email: adminEmail })),
+          'Require configured email verification before authorized administrator setup'
+        );
+      }
+
+      await User.create({
+        name: 'Unauthorized Integration Administrator',
+        email: unauthorizedAdminEmail,
+        password,
+        role: 'admin',
+      });
+      const unauthorizedAdminLogin = await request('POST', '/auth/login', {
+        email: unauthorizedAdminEmail,
+        password,
+      });
+      assert(
+        unauthorizedAdminLogin.status === 403,
+        'Reject administrator login for an email outside ADMIN_EMAIL'
+      );
+      await User.deleteOne({ email: unauthorizedAdminEmail });
+
+      await User.create({
+        name: 'Integration Administrator',
+        email: adminEmail,
+        password,
+        role: 'admin',
+      });
+      const adminLogin = await request('POST', '/auth/login', {
+        email: adminEmail,
+        password,
+      });
+      const adminCookie = adminLogin.headers['set-cookie']
+        ?.find((value) => value.startsWith('edtech_token='))
+        ?.split(';')[0];
+      assert(
+        adminLogin.status === 200 && adminLogin.data.user.role === 'admin',
+        'Allow the configured administrator to sign in'
+      );
+      const adminDashboardApi = await request('GET', '/admin/stats', undefined, adminCookie);
+      assert(adminDashboardApi.status === 200, 'Allow the configured administrator to access administrator APIs');
+      assert(
+        (await request('PATCH', `/admin/users/${(await User.findOne({ email }))._id}/role`, { role: 'admin' }, adminCookie)).status === 403,
+        'Prevent administrator role assignment through the user-management API'
+      );
+
+      let duplicateAdminRejected = false;
+      try {
+        await User.create({
+          name: 'Duplicate Integration Administrator',
+          email: `learn-it-second-admin-${Date.now()}@example.test`,
+          password,
+          role: 'admin',
+        });
+      } catch (error) {
+        duplicateAdminRejected = error.code === 11000;
+      }
+      assert(duplicateAdminRejected, 'Enforce a single administrator account in MongoDB');
+
+      const pendingRequests = await request('GET', '/admin/instructor-requests', undefined, adminCookie);
+      const requestId = pendingRequests.data.requests?.find((entry) => entry.email === instructorEmail)?._id;
+      const approveRequest = requestId
+        ? await request('PATCH', `/admin/instructor-requests/${requestId}`, { decision: 'approve' }, adminCookie)
+        : { status: 404 };
+      const instructorLogin = await request('POST', '/auth/login', {
+        email: instructorEmail,
+        password,
+      });
+      const instructorCookie = instructorLogin.headers['set-cookie']
+        ?.find((value) => value.startsWith('edtech_token='))
+        ?.split(';')[0];
+      assert(
+        pendingRequests.status === 200 && approveRequest.status === 200 &&
+        instructorLogin.status === 200 && instructorLogin.data.user.role === 'instructor',
+        'Administrator approval grants instructor role'
+      );
+      const instructorDashboardApi = await request('GET', '/instructor/stats', undefined, instructorCookie);
+      assert(instructorDashboardApi.status === 200, 'Allow approved instructors to access instructor APIs');
+    } else {
+      const pendingInstructorAccess = await request('GET', '/instructor/stats', undefined, studentCookie);
+      assert(pendingInstructorAccess.status === 403, 'Pending instructor requests do not grant instructor API access');
+    }
+
+    const incorrectLogin = await request('POST', '/auth/login', {
+      email,
+      password: 'Incorrect-Password-742!',
+    });
+    assert(incorrectLogin.status === 401, 'Reject incorrect login credentials');
+
+    const login = await request('POST', '/auth/login', {
+      email,
+      password,
+    });
+    const setCookie = login.headers['set-cookie']?.find((value) => value.startsWith('edtech_token='));
+    const cookie = setCookie?.split(';')[0];
+    assert(login.status === 200 && Boolean(cookie), 'Log in with the registered credentials');
+    assert(setCookie?.includes('HttpOnly') && setCookie?.includes('SameSite=Strict'), 'Store JWT in an HTTP-only, same-site cookie');
+
+    const currentUser = await request('GET', '/auth/me', undefined, cookie);
+    assert(currentUser.status === 200 && currentUser.data.user.role === 'student', 'Load the authenticated student session');
+    const alteredFrontendRole = await request('GET', '/admin/stats', undefined, studentCookie);
+    assert(alteredFrontendRole.status === 403, 'Ignore frontend role tampering and enforce the MongoDB role');
+
+    const storedUser = await User.findOne({ email }).select('+password');
+    assert(
+      Boolean(storedUser) &&
+      storedUser.password !== password &&
+      await bcrypt.compare(password, storedUser.password),
+      'Persist only a bcrypt-hashed password'
+    );
+
+    const adminAccess = await request('GET', '/admin/stats', undefined, cookie);
+    const instructorAccess = await request('GET', '/instructor/stats', undefined, cookie);
+    assert(adminAccess.status === 403, 'Deny student access to administrator routes');
+    assert(instructorAccess.status === 403, 'Deny student access to instructor routes');
+
+    const courses = await request('GET', '/courses', undefined, cookie);
+    const assessments = await request('GET', '/assessments', undefined, cookie);
+    const quizzes = await request('GET', '/quizzes', undefined, cookie);
+    const progress = await request('GET', '/progress/my-progress', undefined, cookie);
+    assert(courses.status === 200, 'Existing course catalog endpoint responds');
+    assert(assessments.status === 200, 'Existing assessments endpoint responds');
+    assert(quizzes.status === 200, 'Existing quizzes endpoint responds');
+    assert(progress.status === 200, 'Existing student progress endpoint responds');
+
+    const verificationToken = crypto.randomBytes(32).toString('hex');
+    await User.create({
+      name: 'Pending Verification Student',
+      email: verificationEmail,
+      password,
+      role: 'student',
+      emailVerified: false,
+      emailVerificationTokenHash: crypto.createHash('sha256').update(verificationToken).digest('hex'),
+      emailVerificationExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+    });
+    const unverifiedLogin = await request('POST', '/auth/login', {
+      email: verificationEmail,
+      password,
+    });
+    assert(unverifiedLogin.status === 403, 'Require email verification before login when enabled');
+    const verified = await request('POST', '/auth/verify-email', { token: verificationToken });
+    assert(verified.status === 200, 'Verify an account with its valid expiring token');
+    const verifiedLogin = await request('POST', '/auth/login', {
+      email: verificationEmail,
+      password,
+    });
+    assert(verifiedLogin.status === 200, 'Allow login after email verification');
+
+    const logout = await request('POST', '/auth/logout', undefined, cookie);
+    const sessionAfterLogout = await request('GET', '/auth/me');
+    const clearedCookie = logout.headers['set-cookie']?.some((value) =>
+      value.startsWith('edtech_token=') &&
+      (value.includes('Max-Age=0') || value.includes('Expires=Thu, 01 Jan 1970'))
+    );
+    assert(logout.status === 200 && clearedCookie, 'Logout clears the authentication cookie');
+    assert(sessionAfterLogout.status === 401, 'Unauthenticated requests are rejected after logout');
+  } finally {
+    await User.deleteMany({
+      email: {
+        $in: [
+          email,
+          verificationEmail,
+          instructorEmail,
+          adminEmail,
+          unauthorizedAdminEmail,
+        ],
+      },
+    });
+    await mongoose.disconnect();
+  }
+}
+
+runTests()
+  .then(() => {
+    console.log(`\nResults: ${passed}/${total} checks passed.`);
+    if (passed !== total) process.exitCode = 1;
+  })
+  .catch((error) => {
+    console.error(`Integration checks could not complete: ${error.message}`);
+    process.exitCode = 1;
+  });

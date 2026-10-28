@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { GraduationCap, Lock, Mail, ArrowRight, AlertCircle, Shield, Award, BookOpen } from 'lucide-react';
+import { GraduationCap, Lock, Mail, ArrowRight, AlertCircle } from 'lucide-react';
 
 export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
@@ -35,12 +35,6 @@ export const LoginPage: React.FC = () => {
     } else {
       setError(res.message || 'Login failed. Please check your credentials.');
     }
-  };
-
-  const fillDemoAccount = (demoEmail: string, demoPass: string) => {
-    setEmail(demoEmail);
-    setPassword(demoPass);
-    setError('');
   };
 
   return (
@@ -113,7 +107,7 @@ export const LoginPage: React.FC = () => {
                   type="email"
                   className="form-input"
                   style={{ paddingLeft: '2.75rem' }}
-                  placeholder="e.g. student@edtech.com"
+                  placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -157,94 +151,6 @@ export const LoginPage: React.FC = () => {
               )}
             </button>
           </form>
-
-          {/* Role-Based Quick Access & Workflows */}
-          <div style={{
-            marginTop: '1.75rem',
-            padding: '1.25rem',
-            borderRadius: 'var(--radius-lg)',
-            backgroundColor: '#F8FAFC',
-            border: '1px solid var(--border)'
-          }}>
-            <div style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--text-main)', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span>SELECT DEMO ROLE & WORKFLOW:</span>
-              <span style={{ fontSize: '0.725rem', color: 'var(--text-muted)', fontWeight: 500 }}>Click to fill credentials</span>
-            </div>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
-              {/* Student Role */}
-              <div
-                onClick={() => fillDemoAccount('student@edtech.com', 'Student@123')}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: email === 'student@edtech.com' ? 'var(--primary-light)' : '#FFFFFF',
-                  border: `1.5px solid ${email === 'student@edtech.com' ? 'var(--primary)' : 'var(--border)'}`,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.875rem', color: 'var(--primary)' }}>
-                    <BookOpen size={16} />
-                    <span>Student Role</span>
-                  </div>
-                  <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>student@edtech.com</span>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  <strong>Workflow:</strong> Enroll in courses, stream video lectures, take 180 assessment questions, attempt 120 timed quizzes & track real progress.
-                </div>
-              </div>
-
-              {/* Instructor Role */}
-              <div
-                onClick={() => fillDemoAccount('instructor@edtech.com', 'Instructor@123')}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: email === 'instructor@edtech.com' ? 'var(--accent-light)' : '#FFFFFF',
-                  border: `1.5px solid ${email === 'instructor@edtech.com' ? 'var(--accent)' : 'var(--border)'}`,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.875rem', color: 'var(--accent)' }}>
-                    <Award size={16} />
-                    <span>Instructor Role</span>
-                  </div>
-                  <span className="badge badge-accent" style={{ fontSize: '0.7rem' }}>instructor@edtech.com</span>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  <strong>Workflow:</strong> Create courses, publish/unpublish curriculum, upload learning materials, view enrolled students & inspect test results.
-                </div>
-              </div>
-
-              {/* Admin Role */}
-              <div
-                onClick={() => fillDemoAccount('admin@edtech.com', 'Admin@123')}
-                style={{
-                  padding: '0.75rem',
-                  borderRadius: 'var(--radius-md)',
-                  backgroundColor: email === 'admin@edtech.com' ? 'var(--danger-light)' : '#FFFFFF',
-                  border: `1.5px solid ${email === 'admin@edtech.com' ? 'var(--danger)' : 'var(--border)'}`,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontWeight: 700, fontSize: '0.875rem', color: 'var(--danger)' }}>
-                    <Shield size={16} />
-                    <span>Administrator Role</span>
-                  </div>
-                  <span className="badge badge-danger" style={{ fontSize: '0.7rem' }}>admin@edtech.com</span>
-                </div>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                  <strong>Workflow:</strong> Full platform metrics, user management, toggle active/inactive account status, modify user roles (Student ⇄ Instructor ⇄ Admin).
-                </div>
-              </div>
-            </div>
-          </div>
 
           <div style={{ marginTop: '1.5rem', textAlign: 'center', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
             New student?{' '}
