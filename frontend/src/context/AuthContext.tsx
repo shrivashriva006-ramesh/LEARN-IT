@@ -22,11 +22,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     const checkAuth = async () => {
-      if (['/login', '/register', '/verify-email'].includes(window.location.pathname)) {
-        setIsLoading(false);
-        return;
-      }
-
       try {
         const res = await api.get('/auth/me');
         if (res.data.success && res.data.user) {
@@ -51,7 +46,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email: email.trim().toLowerCase(),
         password,
       });
-      if (res.data.success) {
+      if (res.data.success && res.data.user) {
         const { user: receivedUser } = res.data;
         setUser(receivedUser);
         return { success: true, user: receivedUser };
@@ -105,7 +100,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setUser(res.data.user);
       }
     } catch (err) {
-      console.error('Failed to refresh user:', err);
+      if (axios.isAxiosError(err) && err.response?.status === 401) {
+        setUser(null);
+      } else {
+        console.error('Failed to refresh user:', getErrorMessage(err));
+      }
     }
   };
 

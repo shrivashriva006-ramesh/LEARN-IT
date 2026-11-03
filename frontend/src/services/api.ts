@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: import.meta.env.VITE_API_URL || '/api',
   withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
@@ -14,7 +14,9 @@ api.interceptors.response.use(
   (error) => {
     if (error.response && error.response.status === 401) {
       const currentPath = window.location.pathname;
-      if (currentPath !== '/login' && currentPath !== '/register') {
+      const requestUrl = error.config?.url || '';
+      const isAuthCheck = /\/auth\/(me|login|register|verify-email|logout)(?:\?|$)/.test(requestUrl);
+      if (!isAuthCheck && !['/login', '/register', '/verify-email'].includes(currentPath)) {
         window.location.href = '/login';
       }
     }

@@ -4,6 +4,73 @@ const crypto = require('crypto');
 const { isSmtpConfigured, sendVerificationEmail } = require('../utils/email');
 const { getConfiguredAdminEmail, isAuthorizedAdminEmail } = require('../utils/adminEmail');
 
+exports.getDemoAccounts = async (req, res, next) => {
+  if (process.env.NODE_ENV !== 'development') {
+    return res.set('Cache-Control', 'no-store').status(200).json({ success: true, accounts: [] });
+  }
+
+  try {
+    res.set('Cache-Control', 'no-store');
+    const isLoopbackRequest = [
+      '127.0.0.1',
+      '::1',
+      '::ffff:127.0.0.1',
+    ].includes(req.socket.remoteAddress);
+    const canShareCredentials = isLoopbackRequest;
+    const configuredDemoEmails = [
+      process.env.DEMO_STUDENT_EMAIL,
+      process.env.DEMO_INSTRUCTOR_EMAIL,
+    ].filter(Boolean);
+    const accounts = await User.find({
+      role: { $in: ['student', 'instructor'] },
+      status: 'active',
+      email: { $in: configuredDemoEmails },
+    })
+      .select('name email role')
+      .sort({ role: 1, createdAt: 1 })
+      .lean();
+
+    const adminExists = await User.findOne({
+      role: 'admin',
+      status: 'active',
+      email: getConfiguredAdminEmail(),
+    }).select('email').lean();
+
+    const configuredAccounts = [
+      ...accounts,
+      ...(adminExists ? [{ name: 'Demo Administrator', email: adminExists.email, role: 'admin' }] : []),
+    ];
+
+    res.status(200).json({
+      success: true,
+      accounts: configuredAccounts.map(({ name, email, role }) => {
+        const rolePrefix = role.toUpperCase();
+        const configuredEmail = process.env[`DEMO_${rolePrefix}_EMAIL`];
+        const password = process.env[`DEMO_${rolePrefix}_PASSWORD`];
+        const emailMatches = role === 'admin'
+          ? isAuthorizedAdminEmail(email) && configuredEmail === email
+          : configuredEmail === email;
+
+        return {
+          name,
+          email: canShareCredentials && emailMatches ? email : undefined,
+          role,
+          password: canShareCredentials && emailMatches ? password : undefined,
+        };
+      }),
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const authCookieOptions = {
+  httpOnly: true,
+  secure: process.env.NODE_ENV === 'production',
+  sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'strict',
+  path: '/api',
+};
+
 // Generate JWT token
 const sendTokenResponse = (user, statusCode, res) => {
   const token = jwt.sign(
@@ -13,10 +80,7 @@ const sendTokenResponse = (user, statusCode, res) => {
   );
 
   res.cookie('edtech_token', token, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/api',
+    ...authCookieOptions,
     maxAge: 7 * 24 * 60 * 60 * 1000,
   });
 
@@ -300,12 +364,7 @@ exports.verifyEmail = async (req, res, next) => {
 // @route   POST /api/auth/logout
 // @access  Public
 exports.logout = (req, res) => {
-  res.clearCookie('edtech_token', {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    path: '/api',
-  });
+  res.clearCookie('edtech_token', authCookieOptions);
   res.status(200).json({ success: true, message: 'Logged out successfully' });
 };
 

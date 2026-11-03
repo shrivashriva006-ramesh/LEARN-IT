@@ -49,7 +49,7 @@ The curriculum features six subjects with structured learning units, 30 assessme
 
 ## 🔐 Authentication
 
-Students register with their own name, email address, and password. Passwords are hashed with bcrypt before storage. Public registration assigns the student role; instructor requests require administrator approval. Only the normalized email configured in the backend's `ADMIN_EMAIL` variable can hold administrator access. Login uses an HTTP-only JWT cookie, and registration does not automatically sign users in.
+Students register with their own name, email address, and password. Passwords are hashed with bcrypt before storage. Public registration assigns the student role; instructor requests require administrator approval. Only the normalized email configured in the backend's `ADMIN_EMAIL` variable can hold administrator access. Login uses an HTTP-only JWT cookie, and registration does not automatically sign users in. In production the cookie uses `SameSite=None; Secure` so credentialed requests work when the frontend and API are on different sites; keep `CLIENT_URL` restricted to the trusted frontend origin.
 
 Email verification is optional and disabled by default. To require it, configure the SMTP environment variables described below and set `EMAIL_VERIFICATION_ENABLED=true`. When enabled, verification links expire after 24 hours.
 
@@ -137,7 +137,11 @@ Remove-Item Env:ADMIN_EMAIL
 
 The bootstrap command reads `ADMIN_EMAIL` from `backend/.env`; the PowerShell assignment above is only needed if overriding it temporarily. The administrator signs in with the password set during registration; no default admin account or password is stored in source code. Administrator API access checks both the database role and the configured email. Additional admin grants through user-management APIs are rejected.
 
+For local development only, `npm run setup-demo-users --prefix backend` can create random-password student and approved-instructor accounts and reset/reactivate the existing admin account. This command requires `DEMO_ADMIN_RESET_CONFIRM=YES`, refuses to run in production, writes demo credentials to the ignored `backend/.env`, and configures the existing admin email if needed. The local login page can autofill demo credentials through a loopback-only development endpoint. Never use demo accounts or enable development mode in production. It does not modify course or assessment data.
+
 For email verification, configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`, `SMTP_PASSWORD`, and `EMAIL_FROM` in the ignored `backend/.env` file, set `CLIENT_URL` to the frontend origin, and set `EMAIL_VERIFICATION_ENABLED=true`. Registration reports an error if verification is enabled without a complete SMTP configuration; no email is claimed to have been sent.
+
+When deploying the frontend and API on different origins, set `CLIENT_URL` in the backend to the exact frontend origin and set `VITE_API_URL` when building the frontend to the backend API URL ending in `/api` (for example, `https://api.example.com/api`). Axios includes credentials on API requests; the API must allow that exact origin with credentials. Leave `VITE_API_URL` unset for local development, where Vite proxies `/api` to the backend.
 
 ---
 

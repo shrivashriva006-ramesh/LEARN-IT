@@ -3,6 +3,7 @@ const router = express.Router();
 const {
   register,
   login,
+  getDemoAccounts,
   logout,
   verifyEmail,
   getMe,
@@ -11,6 +12,7 @@ const {
 const { protect } = require('../middleware/auth');
 
 router.post('/register', register);
+router.get('/demo-accounts', getDemoAccounts);
 router.post('/login', login);
 router.post('/logout', logout);
 router.post('/verify-email', verifyEmail);
